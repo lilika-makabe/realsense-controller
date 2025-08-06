@@ -1,8 +1,9 @@
-import pyrealsense2 as rs
-import numpy as np
-import cv2
 import time
+import cv2
+import numpy as np
+import pyrealsense2 as rs
 import os
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"  # Enable OpenEXR support in OpenCV
 
 """
 Controlled Capture for Intel RealSense Cameras
@@ -45,6 +46,11 @@ class PathConfigs:
     @property
     def ir_right_path(self):
         return os.path.join(self.save_path, 'ir_right')
+
+    @property
+    def config_path(self):
+        os.makedirs(self.save_path, exist_ok=True)
+        return os.path.join(self.save_path, 'camera_config.yaml')
 
 
 def set_realsense_options(sensors, config: CamConfigs):
@@ -93,6 +99,24 @@ def print_realsense_options(sensors):
             print(f"Auto White Balance Enabled: {auto_white_balance}")
 
 
+def save_realsense_options(sensors, path):
+    # Save current camera settings to a file
+    with open(path, 'w') as f:
+        for sensor in sensors:
+            if sensor.get_info(rs.camera_info.name) == 'RGB Camera':
+                exposure = sensor.get_option(rs.option.exposure)
+                gain = sensor.get_option(rs.option.gain)
+                white_balance = sensor.get_option(rs.option.white_balance)
+                auto_exposure = sensor.get_option(rs.option.enable_auto_exposure)
+                auto_white_balance = sensor.get_option(rs.option.enable_auto_white_balance)
+
+                f.write(f"Exposure: {exposure}\n")
+                f.write(f"Gain: {gain}\n")
+                f.write(f"White Balance: {white_balance}\n")
+                f.write(f"Auto Exposure Enabled: {auto_exposure}\n")
+                f.write(f"Auto White Balance Enabled: {auto_white_balance}\n")
+
+
 def sanitary_check_camconfigs(sensors, config: CamConfigs):
     # Sanitary check for camera settings
     for sensor in sensors:
@@ -135,6 +159,7 @@ def controlled_capture(cam_config: CamConfigs, save=False, path_config: PathConf
     set_realsense_options(sensors, cam_config)
     print("--->")
     print_realsense_options(sensors)
+    save_realsense_options(sensors, path_config.config_path)
 
     align_to = rs.stream.color
     align = rs.align(align_to)
@@ -182,12 +207,13 @@ def controlled_capture(cam_config: CamConfigs, save=False, path_config: PathConf
                 os.makedirs(path_config.ir_left_path, exist_ok=True)
                 os.makedirs(path_config.ir_right_path, exist_ok=True)
                 cv2.imwrite(os.path.join(path_config.image_path, f'color_{timestamp}.png'), color_image)
-                cv2.imwrite(os.path.join(path_config.depth_path, f'depth_{timestamp}.png'), depth_colormap)
-                cv2.imwrite(os.path.join(path_config.ir_left_path, f'ir_left_{timestamp}.png'), ir_left_image)
-                cv2.imwrite(os.path.join(path_config.ir_right_path, f'ir_right_{timestamp}.png'), ir_right_image)
+                cv2.imwrite(os.path.join(path_config.depth_path, f'depth_{timestamp}.exr'), depth_image.astype(np.float32))
+                cv2.imwrite(os.path.join(path_config.ir_left_path, f'ir_left_{timestamp}.exr'), ir_left_image.astype(np.float32))
+                cv2.imwrite(os.path.join(path_config.ir_right_path, f'ir_right_{timestamp}.exr'), ir_right_image.astype(np.float32))
                 # Save color and depth images with timestamp
                 # cv2.imwrite(f'color_{timestamp}.png', color_image)
                 # cv2.imwrite(f'depth_{timestamp}.png', depth_colormap)
+                print(f"Captured images at timestamp {timestamp}")
             sanitary_check_camconfigs(sensors, cam_config)
 
             # Exit when 'q' key is pressed
@@ -211,9 +237,9 @@ if __name__ == "__main__":
     import argparse
     # Create command line argument parser
     parser = argparse.ArgumentParser(description='RealSense Camera Control Example')
-    parser.add_argument('--exposure', type=int, default=19, help='Exposure time in microseconds (default: 19)')
+    parser.add_argument('--exposure', type=int, default=100, help='Exposure time in microseconds (default: 19)')
     parser.add_argument('--gain', type=int, default=64, help='Gain value (default: 64)')
-    parser.add_argument('--white_balance', type=int, default=4600, help='White balance value (default: 4600)')
+    parser.add_argument('--white_balance', type=int, default=3500, help='White balance value (default: 4600)')
     parser.add_argument('--fps', type=int, default=30, help='Frames per second (default: 30)')
     parser.add_argument('--save', action='store_true', help='Save captured images to disk')
     parser.add_argument('--ignore_exposure_warnings', action='store_true', help='Ignore warnings to avoid exposure>=FPS situation; the exposure will be different than the one specified.')
