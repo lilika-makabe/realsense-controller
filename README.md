@@ -61,4 +61,4 @@ capture_YYYYMMDD_HHMMSS/
 ## Key Controls
 
 - **Q**: Quit the application
-- Images are automatically captured every 0.5 seconds when `--save` is enabled
+- Images are automatically captured when `--save` is enabled
