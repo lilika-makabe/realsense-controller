@@ -1,9 +1,9 @@
+import os
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"  # Enable OpenEXR support in OpenCV
 import time
 import cv2
 import numpy as np
 import pyrealsense2 as rs
-import os
-os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"  # Enable OpenEXR support in OpenCV
 
 """
 Controlled Capture for Intel RealSense Cameras
@@ -83,6 +83,18 @@ def set_realsense_options(sensors, config: CamConfigs):
             sensor.set_option(rs.option.enable_auto_exposure, 0)
 
 
+def set_depth_options(device):
+    depth_sensor = device.first_depth_sensor()
+    if depth_sensor.supports(rs.option.laser_power):
+        depth_sensor.set_option(rs.option.laser_power, depth_sensor.get_option_range(rs.option.laser_power).max)
+
+    # if depth_sensor.supports(rs.option.exposure):
+        # depth_sensor.set_option(rs.option.exposure, 8500)  # or auto
+
+    if depth_sensor.supports(rs.option.gain):
+        depth_sensor.set_option(rs.option.gain, 16)  # lower gain = less noise
+
+
 def print_realsense_options(sensors):
     for sensor in sensors:
         if sensor.get_info(rs.camera_info.name) == 'RGB Camera':
@@ -153,6 +165,7 @@ def controlled_capture(cam_config: CamConfigs, save=False, path_config: PathConf
     profile = pipeline.start(config)
     device = profile.get_device()
     sensors = device.query_sensors()
+    set_depth_options(device)
     print(sensors)
 
     print_realsense_options(sensors)
@@ -161,7 +174,7 @@ def controlled_capture(cam_config: CamConfigs, save=False, path_config: PathConf
     print_realsense_options(sensors)
     save_realsense_options(sensors, path_config.config_path)
 
-    align_to = rs.stream.color
+    align_to = rs.stream.depth  # Align all to depth frame
     align = rs.align(align_to)
 
     try:
